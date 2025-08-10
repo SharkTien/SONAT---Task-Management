@@ -1,7 +1,7 @@
 import React from 'react'
 
 type Props = {
-    name: string;
+    name: string | React.ReactNode;
     buttonComponent?: any;
     isSmallText?: boolean;
 }
