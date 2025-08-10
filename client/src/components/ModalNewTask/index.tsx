@@ -31,23 +31,23 @@ const ModalNewTask = ({ isOpen, onClose, id = null, defaultStatus = Status.Todo 
   const handleSubmit = async () => {
     if (!title || !authorUserId || !(id !== null || projectId)) return;
 
-    let formattedStartDate = null;
-    let formattedDueDate = null;
+    let formattedStartDate: string | undefined = undefined;
+    let formattedDueDate: string | undefined = undefined;
 
     try {
-      if (startDate) {
+      formattedStartDate = startDate ? (() => {
         const startDateObj = new Date(startDate);
-        if (!isNaN(startDateObj.getTime()) && startDateObj.getFullYear() > 1900) {
-          formattedStartDate = formatISO(startDateObj, { representation: "complete" });
-        }
-      }
+        return !isNaN(startDateObj.getTime()) && startDateObj.getFullYear() > 1900
+          ? formatISO(startDateObj, { representation: "complete" })
+          : undefined;
+      })() : undefined;
       
-      if (dueDate) {
+      formattedDueDate = dueDate ? (() => {
         const dueDateObj = new Date(dueDate);
-        if (!isNaN(dueDateObj.getTime()) && dueDateObj.getFullYear() > 1900) {
-          formattedDueDate = formatISO(dueDateObj, { representation: "complete" });
-        }
-      }
+        return !isNaN(dueDateObj.getTime()) && dueDateObj.getFullYear() > 1900
+          ? formatISO(dueDateObj, { representation: "complete" })
+          : undefined;
+      })() : undefined;
     } catch (error) {
       console.error("Invalid date format:", error);
       return;
