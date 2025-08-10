@@ -25,7 +25,9 @@ app.use((req, res, next) => {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.CLIENT_URL || 'http://localhost:3000', 'https://sonat-task-management-yhzq.vercel.app']
+    : 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
