@@ -1,14 +1,14 @@
-import React from 'react'
+import React, { useState } from 'react'
 import Image from 'next/image';
-import { Task as TaskType, useGetTaskQuery, useUpdateTaskStatusMutation } from '@/state/api';
+import { Status, Task as TaskType, useGetTaskQuery, useUpdateTaskStatusMutation, useDeleteTaskMutation, useToggleTaskCompletionMutation, useUpdateTaskMutation } from '@/state/api';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { EllipsisVertical, MessageSquareMore, Plus } from 'lucide-react';
+import { Check, EllipsisVertical, MessageSquareMore, Plus, X } from 'lucide-react';
 import { format } from "date-fns";
 
 type BoardProps = {
     id: string;
-    setIsModalNewTaskOpen: (isOpen: boolean) => void;
+    setIsModalNewTaskOpen: (isOpen: boolean, status?: Status) => void;
 }
 
 const taskStatus = ["To Do", "Work In Progress", "Under Review", "Completed"];
@@ -45,7 +45,7 @@ interface TaskColumnProps {
     status: string;
     tasks: TaskType[];
     moveTask: (taskId: number, toStatus: string) => void;
-    setIsModalNewTaskOpen: (isOpen: boolean) => void;
+    setIsModalNewTaskOpen: (isOpen: boolean, status?: Status) => void;
 }
 
 
@@ -92,8 +92,16 @@ const TaskColumn = ({ status, tasks, moveTask, setIsModalNewTaskOpen }: TaskColu
                             <button className="flex h-6 w-5 items-center justify-center dark:text-neutral-500">
                                 <EllipsisVertical size={26} />
                             </button>
-                            <button className="flex h-6 w-6 items-center rounded bg-gray-200 dark:bg-dark-tertiary dark:text-white"
-                            onClick={() => setIsModalNewTaskOpen(true)}>
+                            <button className="flex h-6 w-6 items-center justify-center rounded bg-gray-200 dark:bg-dark-tertiary dark:text-white"
+                            onClick={() => {
+                                const statusMap = {
+                                    "To Do": Status.Todo,
+                                    "Work In Progress": Status.WorkInProgress,
+                                    "Under Review": Status.UnderReview,
+                                    "Completed": Status.Completed   
+                                };
+                                setIsModalNewTaskOpen(true, statusMap[status as keyof typeof statusMap]);
+                            }}>
                                 <Plus size={16} />
                             </button>
                         </div>
@@ -101,8 +109,8 @@ const TaskColumn = ({ status, tasks, moveTask, setIsModalNewTaskOpen }: TaskColu
                 </div>
             {
                 tasks.filter((task) => task.status === status)
-                .map((task) => (
-                    <Task key={task.id} task={task} />
+                .map((task, index) => (
+                    <Task key={`${task.id}-${index}`} task={task} />
                 ))
             }
         </div>
@@ -115,6 +123,11 @@ type TaskProps = {
 }
 
 const Task = ({ task } : TaskProps) => {
+    const [showOptions, setShowOptions] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [deleteTask] = useDeleteTaskMutation();
+    const [toggleCompletion] = useToggleTaskCompletionMutation();
+    const [updateTask] = useUpdateTaskMutation();
     const [{ isDragging }, drag] = useDrag(() => ({
         type: "task",
         item: {id: task.id},
@@ -165,8 +178,10 @@ const Task = ({ task } : TaskProps) => {
                         <div className="flex flex-1 flex-wrap items-center gap-2">
                             {task.priority && <PriorityTag priority={task.priority} />}
                             <div className="flex gap-2">
-                                {taskTagsSplit.map((tag) => (
-                                    <div key={tag} className="rounded-full bg-blue-100 px-2 py-1 text-xs"
+                                {taskTagsSplit.map((tag, index) => (
+                                    <div 
+                                        key={`${task.id}-${tag}-${index}`} 
+                                        className="rounded-full bg-blue-100 px-2 py-1 text-xs"
                                     >
                                         {" "}
                                         {tag}
@@ -174,12 +189,84 @@ const Task = ({ task } : TaskProps) => {
                                 ))}
                             </div>
                         </div>
-                        <button className="flex h-6 w-4 flex-shrink-0 items-center justify-center dark:text-neutral-500">
-                            <EllipsisVertical size={26} />
-                        </button>
+                        <div className="relative">
+                            <button 
+                                className="flex h-6 w-4 flex-shrink-0 items-center justify-center dark:text-neutral-500"
+                                onClick={() => setShowOptions(!showOptions)}
+                            >
+                                <EllipsisVertical size={26} />
+                            </button>
+                            
+                            {showOptions && (
+                                <div className="absolute right-0 top-6 z-50 mt-1 w-48 rounded-md bg-white shadow-lg dark:bg-gray-800">
+                                    <div className="py-1">
+                                        <button
+                                            className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                            onClick={() => {
+                                                setIsEditing(true);
+                                                setShowOptions(false);
+                                            }}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                            onClick={() => {
+                                                toggleCompletion(task.id);
+                                                setShowOptions(false);
+                                            }}
+                                        >
+                                            {task.status === "Completed" ? "Mark as Incomplete" : "Mark as Complete"}
+                                        </button>
+                                        <button
+                                            className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:text-red-400 dark:hover:bg-gray-700"
+                                            onClick={async () => {
+                                                try {
+                                                    await deleteTask(task.id).unwrap();
+                                                    setShowOptions(false);
+                                                } catch (error) {
+                                                    console.error('Failed to delete task:', error);
+                                                    alert(error instanceof Error ? error.message : 'Failed to delete task');
+                                                }
+                                            }}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div className="my-3 flex justify-between">
-                        <h4 className="text-md font-bold dark:text-white">{task.title}</h4>
+                        {isEditing ? (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={task.title}
+                                    onChange={(e) => {
+                                        updateTask({
+                                            taskId: task.id,
+                                            title: e.target.value
+                                        });
+                                    }}
+                                    className="flex-1 bg-transparent text-md font-bold dark:text-white focus:outline-none"
+                                />
+                                <button
+                                    onClick={() => setIsEditing(false)}
+                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                    <Check size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setIsEditing(false)}
+                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        ) : (
+                            <h4 className="text-md font-bold dark:text-white">{task.title}</h4>
+                        )}
                         {typeof task.points === "number" && (
                             <div className="text-xs font-semibold dark:text-white">
                                 {task.points} pts
@@ -199,7 +286,7 @@ const Task = ({ task } : TaskProps) => {
                             <div className="flex -space-x-[6px] overflow-hidden">
                                 {task.assignee && (
                                     <Image
-                                    key={task.assignee.userId}
+                                    key={`assignee-${task.assignee.userId}-${task.id}`}
                                     src={`/${task.assignee.profilePictureUrl!}`}
                                     alt={task.assignee.username}
                                     width={30}
@@ -209,7 +296,7 @@ const Task = ({ task } : TaskProps) => {
                                 )}
                                 {task.author && (
                                     <Image
-                                    key={task.author.userId}
+                                    key={`author-${task.author.userId}-${task.id}`}
                                     src={`/${task.author.profilePictureUrl!}`}
                                     alt={task.author.username}
                                     width={30}
@@ -221,7 +308,7 @@ const Task = ({ task } : TaskProps) => {
                             <div className="flex item-center text-gray-500 dark:text-neutral-500">
                                 <MessageSquareMore size={20} />
                                 <span className="ml-1 text-sm dark:text-neutral-400">
-                                    {task.points} pts
+                                    {numberOfComments}
                                 </span>
                                 
                             </div>

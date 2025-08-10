@@ -1,19 +1,25 @@
 import Modal from "@/components/Modal";
 import { Priority, Status, useCreateTaskMutation } from "@/state/api";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { formatISO } from "date-fns";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   id?: string | null;
+  defaultStatus?: Status;
 };
 
-const ModalNewTask = ({ isOpen, onClose, id = null }: Props) => {
+const ModalNewTask = ({ isOpen, onClose, id = null, defaultStatus = Status.Todo }: Props) => {
   const [createTask, { isLoading }] = useCreateTaskMutation();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<Status>(Status.Todo);
+  const [status, setStatus] = useState<Status>(defaultStatus);
+
+  // Update status when defaultStatus changes
+  useEffect(() => {
+    setStatus(defaultStatus);
+  }, [defaultStatus]);
   const [priority, setPriority] = useState<Priority>(Priority.Backlog);
   const [tags, setTags] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -25,29 +31,63 @@ const ModalNewTask = ({ isOpen, onClose, id = null }: Props) => {
   const handleSubmit = async () => {
     if (!title || !authorUserId || !(id !== null || projectId)) return;
 
-    const formattedStartDate = formatISO(new Date(startDate), {
-      representation: "complete",
-    });
-    const formattedDueDate = formatISO(new Date(dueDate), {
-      representation: "complete",
-    });
+    let formattedStartDate = null;
+    let formattedDueDate = null;
 
-    await createTask({
-      title,
-      description,
-      status,
-      priority,
-      tags,
-      startDate: formattedStartDate,
-      dueDate: formattedDueDate,
-      authorUserId: parseInt(authorUserId),
-      assignedUserId: parseInt(assignedUserId),
-      projectId: id !== null ? Number(id) : Number(projectId),
-    });
+    try {
+      if (startDate) {
+        const startDateObj = new Date(startDate);
+        if (!isNaN(startDateObj.getTime()) && startDateObj.getFullYear() > 1900) {
+          formattedStartDate = formatISO(startDateObj, { representation: "complete" });
+        }
+      }
+      
+      if (dueDate) {
+        const dueDateObj = new Date(dueDate);
+        if (!isNaN(dueDateObj.getTime()) && dueDateObj.getFullYear() > 1900) {
+          formattedDueDate = formatISO(dueDateObj, { representation: "complete" });
+        }
+      }
+    } catch (error) {
+      console.error("Invalid date format:", error);
+      return;
+    }
+
+    try {
+      await createTask({
+        title,
+        description,
+        status,
+        priority,
+        tags,
+        startDate: formattedStartDate,
+        dueDate: formattedDueDate,
+        authorUserId: parseInt(authorUserId),
+        assignedUserId: parseInt(assignedUserId),
+        projectId: id !== null ? Number(id) : Number(projectId),
+      }).unwrap();
+      
+      // Reset form
+      setTitle("");
+      setDescription("");
+      setStatus(defaultStatus);
+      setPriority(Priority.Backlog);
+      setTags("");
+      setStartDate("");
+      setDueDate("");
+      setAuthorUserId("");
+      setAssignedUserId("");
+      setProjectId("");
+      
+      // Close modal
+      onClose();
+    } catch (error) {
+      console.error("Failed to create task:", error);
+    }
   };
 
   const isFormValid = () => {
-    return title && authorUserId && !(id !== null || projectId);
+    return title && authorUserId && (id !== null || projectId);
   };
 
   const selectStyles =
@@ -154,7 +194,7 @@ const ModalNewTask = ({ isOpen, onClose, id = null }: Props) => {
         )}
         <button
           type="submit"
-          className={`focus-offset-2 mt-4 flex w-full justify-center rounded-md border border-transparent bg-blue-primary px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+          className={`focus-offset-2 mt-4 flex w-full justify-center rounded-md border border-transparent bg-blue-800 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 ${
             !isFormValid() || isLoading ? "cursor-not-allowed opacity-50" : ""
           }`}
           disabled={!isFormValid() || isLoading}

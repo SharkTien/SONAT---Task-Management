@@ -87,6 +87,115 @@ export const updateTaskStatus = async (
   }
 };
 
+export const updateTask = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { taskId } = req.params;
+  const {
+    title,
+    description,
+    status,
+    priority,
+    tags,
+    startDate,
+    dueDate,
+    points,
+    assignedUserId,
+  } = req.body;
+
+  try {
+    const updatedTask = await prisma.task.update({
+      where: {
+        id: Number(taskId),
+      },
+      data: {
+        title,
+        description,
+        status,
+        priority,
+        tags,
+        startDate,
+        dueDate,
+        points,
+        assignedUserId,
+      },
+      include: {
+        author: true,
+        assignee: true,
+        comments: true,
+        attachments: true,
+      },
+    });
+    res.json(updatedTask);
+  } catch (error: any) {
+    res.status(500).json({ message: `Error updating task: ${error.message}` });
+  }
+};
+
+
+export const deleteTask = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { taskId } = req.params;
+
+  try {
+
+    const existingTask = await prisma.task.findUnique({
+      where: { id: Number(taskId) }
+    });
+
+    if (!existingTask) {
+      res.status(404).json({ message: "Task not found" });
+      return;
+    }
+
+    await prisma.task.delete({
+      where: { id: Number(taskId) }
+    });
+
+         res.json({ message: "Task and all related data deleted successfully" });
+     } catch (error: any) {
+       res.status(500).json({ message: `Error deleting task: ${error.message}` });
+    }
+};
+
+export const toggleTaskCompletion = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { taskId } = req.params;
+
+  try {
+    const task = await prisma.task.findUnique({
+      where: { id: Number(taskId) },
+    });
+
+    if (!task) {
+      res.status(404).json({ message: "Task not found" });
+      return;
+    }
+
+    const updatedTask = await prisma.task.update({
+      where: { id: Number(taskId) },
+      data: {
+        status: task.status === "Completed" ? "To Do" : "Completed",
+      },
+      include: {
+        author: true,
+        assignee: true,
+        comments: true,
+        attachments: true,
+      },
+    });
+
+    res.json(updatedTask);
+  } catch (error: any) {
+    res.status(500).json({ message: `Error toggling task completion: ${error.message}` });
+  }
+};
+
 export const getUserTasks = async (
   req: Request,
   res: Response

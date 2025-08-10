@@ -1,5 +1,5 @@
 import { useAppSelector } from "@/app/redux";
-import { useGetTaskQuery } from "@/state/api";
+import { Task, useGetTaskQuery } from "@/state/api";
 import { DisplayOption, Gantt, ViewMode } from "gantt-task-react";
 import "gantt-task-react/dist/index.css";
 import React, { useMemo, useState } from "react";
@@ -10,6 +10,16 @@ type Props = {
 };
 
 type TaskTypeItems = "task" | "milestone" | "project";
+
+interface GanttTask {
+  start: Date;
+  end: Date;
+  name: string;
+  id: string;
+  type: TaskTypeItems;
+  progress: number;
+  isDisabled: boolean;
+}
 
 const Timeline = ({ id, setIsModalNewTaskOpen }: Props) => {
   const isDarkMode = useAppSelector((state) => state.global.isDarkMode);
@@ -24,50 +34,63 @@ const Timeline = ({ id, setIsModalNewTaskOpen }: Props) => {
     locale: "en-US",
   });
 
-  const ganttTasks = useMemo(() => {
+  const ganttTasks = useMemo<GanttTask[]>(() => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    return (
-      tasks?.map((task, index) => {
-        // Ensure valid dates by checking if they can be parsed correctly
-        let startDate = today;
-        let endDate = tomorrow;
-        
-        try {
-          if (task.startDate) {
-            const parsedStart = new Date(task.startDate);
-            if (!isNaN(parsedStart.getTime())) {
-              startDate = parsedStart;
-            }
-          }
-          
-          if (task.dueDate) {
-            const parsedEnd = new Date(task.dueDate);
-            if (!isNaN(parsedEnd.getTime())) {
-              endDate = parsedEnd;
-            }
-          }
-        } catch (error) {
-          console.warn('Invalid date format for task:', task.title);
-        }
 
-        return {
-          start: startDate,
-          end: endDate,
-          name: task.title + (!task.startDate || !task.dueDate ? ' (No dates specified)' : ''),
-          id: `Task-${task.title}-${index}`, // Use title and index for unique key
-          type: "task" as TaskTypeItems,
-          progress: task.points ? (task.points / 10) * 100 : 0,
-          isDisabled: false,
-        };
-      }) || []
-    );
+    if (!tasks || tasks.length === 0) {
+      return [{
+        start: today,
+        end: tomorrow,
+        name: "No tasks yet",
+        id: "empty-task",
+        type: "task",
+        progress: 0,
+        isDisabled: true,
+      }];
+    }
+
+    return tasks.map((task: Task, index: number) => {
+      let startDate = today;
+      let endDate = tomorrow;
+      
+      try {
+        if (task.startDate) {
+          const parsedStart = new Date(task.startDate);
+          if (!isNaN(parsedStart.getTime()) && parsedStart.getFullYear() > 1900) {
+            startDate = parsedStart;
+          } else {
+            console.warn('Invalid start date for task:', task.title, task.startDate);
+          }
+        }
+        
+        if (task.dueDate) {
+          const parsedEnd = new Date(task.dueDate);
+          if (!isNaN(parsedEnd.getTime()) && parsedEnd.getFullYear() > 1900) {
+            endDate = parsedEnd;
+          } else {
+            console.warn('Invalid due date for task:', task.title, task.dueDate);
+          }
+        }
+      } catch (error) {
+        console.warn('Error parsing dates for task:', task.title, error);
+      }
+
+      return {
+        start: startDate,
+        end: endDate,
+        name: task.title + (!task.startDate || !task.dueDate ? ' (No dates specified)' : ''),
+        id: `Task-${task.title}-${index}`,
+        type: "task",
+        progress: task.points ? (task.points / 10) * 100 : 0,
+        isDisabled: false,
+      };
+    });
   }, [tasks]);
 
   const handleViewModeChange = (
-    event: React.ChangeEvent<HTMLSelectElement>,
+    event: React.ChangeEvent<HTMLSelectElement>
   ) => {
     setDisplayOptions((prev) => ({
       ...prev,
@@ -76,7 +99,7 @@ const Timeline = ({ id, setIsModalNewTaskOpen }: Props) => {
   };
 
   if (isLoading) return <div>Loading...</div>;
-  if (error || !tasks) return <div>An error occurred while fetching tasks</div>;
+  if (error) return <div>An error occurred while fetching tasks</div>;
 
   return (
     <div className="px-4 xl:px-6">
@@ -110,7 +133,7 @@ const Timeline = ({ id, setIsModalNewTaskOpen }: Props) => {
         </div>
         <div className="px-4 pb-5 pt-1">
           <button
-            className="flex items-center rounded bg-blue-primary px-3 py-2 text-white hover:bg-blue-600"
+            className="flex items-center rounded bg-blue-800 px-3 py-2 text-white hover:bg-blue-600"
             onClick={() => setIsModalNewTaskOpen(true)}
           >
             Add New Task

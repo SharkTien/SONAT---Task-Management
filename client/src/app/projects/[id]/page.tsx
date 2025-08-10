@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react'
+import { Status } from '@/state/api';
 import ProjectHeader from '@/app/projects/ProjectHeader';
 import Board from '../BoardView';
 import List from '../ListView';
@@ -16,19 +17,25 @@ const Project = ({ params } : Props) => {
     const { id } = params;
     const [activateTab, setActivateTab] = useState("Board");
     const [isModalNewTaskOpen, setIsModalNewTaskOpen] = useState(false);
+    const [defaultTaskStatus, setDefaultTaskStatus] = useState<Status>(Status.Todo);
 
     return <div>
         <ModalNewTask
-        isOpen = {isModalNewTaskOpen}
+        isOpen={isModalNewTaskOpen}
         onClose={() => setIsModalNewTaskOpen(false)}
         id={id}
+        defaultStatus={defaultTaskStatus}
         />
         <ProjectHeader 
             activateTab={activateTab} 
             setActivateTab={setActivateTab}
+            projectID={id}
         />
         { activateTab === "Board" && (
-            <Board id={id} setIsModalNewTaskOpen={setIsModalNewTaskOpen}/>
+            <Board id={id} setIsModalNewTaskOpen={(isOpen, status) => {
+                if (status) setDefaultTaskStatus(status);
+                setIsModalNewTaskOpen(isOpen);
+            }}/>
         )}
         { activateTab === "List" && (
             <List id={id} setIsModalNewTaskOpen={setIsModalNewTaskOpen}/>
